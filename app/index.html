@@ -1,7 +1,7 @@
 <!-- Author GW19 <imgw19@gmail.com> -->
 
 <!doctype html>
-<html lang='zh-TW-Hant'>
+<html lang='en'>
 
 <head>
   <meta charset='UTF-8'>
@@ -30,48 +30,50 @@
         <ul class='messages'></ul>
       </div>
 
-      <button class='btn btn-tips' type='button' title='小提示'>?</button>
+      <button class='btn btn-tips' type='button' title='Tips'>?</button>
 
       <div id='effect-tips' class='ui-tips'>
-        <h3 class='tips-title'>小提示</h3>
+        <h3 class='tips-title'>Tips</h3>
         <div class='tips'>
-          <h3>系統指令</h3>
-          <h4>/join [房間名稱]：建立∕加入房間</h4>
-          （房間名稱長度限制為 1～14 個字元，
-          並只能由中文、英文、數字及底線所組成）<br><br>
-          <h4>/ls：刷新房間列表</h4>
-          （系統每30秒會自動刷新，另外有人加入或離開房間也會立即刷新）<br><br>
-          <h4>收合房間列表</h4>
-          （點選房間列表左上角的 « 按鈕可收合∕展開右側面板）<br>
+          <h3>Commands</h3>
+          <h4>/join [room name] — create or join a room</h4>
+          (Room names are 1 to 14 characters, using only letters,
+          digits, underscores and Chinese characters)<br><br>
+          <h4>/ls — refresh the room list</h4>
+          (The list refreshes automatically every 30 seconds, and
+          immediately whenever anyone joins or leaves a room)<br><br>
+          <h4>Collapsing the room list</h4>
+          (Use the « button at the top left of the room list to collapse
+          or expand the right-hand panel)<br>
           <br>
-          作者：GW19 &nbsp;
+          Author: &nbsp;GW19 &nbsp;
           &lt; <a href='mailto:imgw19@gmail.com'>imgw19@gmail.com</a> &gt;<br>
-          Github：<a href='https://github.com/gw19/join-and-chat'
+          GitHub: <a href='https://github.com/gw19/join-and-chat'
                     target='_blank' rel='noopener'>join-and-chat</a>
         </div>
       </div>
 
-      <input class='inputMessage' placeholder='請在此輸入訊息'/>
+      <input class='inputMessage' placeholder='Type your message here'/>
     </li>
 
     <li class='login page' id='login-page'>
       <div class='form'>
-        <h1 class='title'>聊天實驗室</h1>
-        <h3 class='subtitle'>請輸入您的暱稱</h3>
+        <h1 class='title'>Chat Lab</h1>
+        <h3 class='subtitle'>Please enter your nickname</h3>
         <label>
           <input class='usernameInput' type='text' minlength='1' maxlength='14'
-                 title='暱稱需為1~14個字元所組成' autofocus/>
+                 title='Your nickname must be 1 to 14 characters' autofocus/>
         </label>
       </div>
     </li>
 
     <li class='room page' id='room-page'>
       <button class='btn btn-collapse' type='button'
-              title='收合房間列表' aria-expanded='true'
+              title='Collapse room list' aria-expanded='true'
               aria-controls='room-page'>&laquo;</button>
-      <span class='room-rail-label' aria-hidden='true'>房間列表</span>
-      <h1 class='room-title'>房間列表</h1>
-      <p class='room-hint'>點選房間區塊可直接加入該房間</p>
+      <span class='room-rail-label' aria-hidden='true'>Rooms</span>
+      <h1 class='room-title'>Room List</h1>
+      <p class='room-hint'>Click a room to join it</p>
       <ul class='room-list'></ul>
     </li>
 

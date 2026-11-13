@@ -1,42 +1,43 @@
 # join-and-chat
-動態即時多人聊天室（可建立 / 加入房間），基於 node.js + Socket.io + Express。<br>
+A real-time multi-user chat room where you can create and join rooms, built on node.js + Socket.IO + Express.<br>
 
 ![version](https://img.shields.io/badge/version-2.0.0-green.svg)
 
 ![join-and-chat](https://cloud.githubusercontent.com/assets/24193072/26714744/837dccfc-47a5-11e7-86e0-953f63dd9c77.png)<br><br>
 
 ## Introduction
-在<strong> join-and-chat </strong>中，使用者登入並輸入暱稱之後會被預設加入「大廳」，並能與其他在同一個房間內的使用者對話。這個應用程式具有以下特徵：<br>
+In <strong> join-and-chat </strong>, you sign in with a nickname and are placed in the "Lobby" by default, where you can talk to everyone else in the same room. The application works as follows:<br>
 
 <ol>
 
-<li>使用者可以輸入系統指令：<b>/join [room name]</b> 來建立房間，如果房間已經存在則加入它。</li>
+<li>Type the command <b>/join [room name]</b> to create a room, or to join it if it already exists.</li>
 
-<li>除了 /join 指令之外，點選右方房間列表中的房間區塊也能直接加入。紅色背景的房間為您目前所在的房間，括號中為該房間內人數。</li>
+<li>As well as the /join command, you can click any room in the list on the right to join it directly. The room on a red background is the one you are currently in, and the number in brackets is how many people are in it.</li>
 
-<li>輸入指令 <b>/ls</b> 會刷新房間列表，系統每 30 秒刷新一次，如果使用者加入∕離開聊天實驗室或建立∕加入房間，所有人都會自動刷新列表。</li>
+<li>The command <b>/ls</b> refreshes the room list. It also refreshes automatically every 30 seconds, and immediately for everyone whenever someone joins or leaves the chat lab or a room.</li>
+
+<li>The room list can be collapsed to a narrow rail with the « button at its top left, giving the chat panel the full width.</li>
 
 </ol>
 <br>
 
 ## Demo
-原本的 Heroku 示範站台已停止服務，請依下方說明在本機執行。<br>
+The original Heroku demo site has been retired. Follow the instructions below to run it locally.<br>
 <br>
 
 ## How to use the code
- 必須先安裝 node.js（需要 18 以上的版本）<br>
- 在命令提示字元進入專案的路徑後輸入：<br><br>
+ You need node.js installed (version 18 or newer).<br>
+ Open a command prompt, change into the project directory and run:<br><br>
 ```npm install```<br><br>
-它會為您安裝 package.json 中定義的相依模組，完成後輸入：<br><br>
+This installs the dependencies declared in package.json. Once it finishes, run:<br><br>
 ```npm start```<br><br>
-這會啟動本地端伺服器，打開瀏覽器在網址輸入 <b>localhost:3232</b> （port 可透過環境變數 PORT 更改）and that's it!<br><br>
-執行測試：<br><br>
+That starts a local server. Open a browser at <b>localhost:3232</b> (the port can be changed with the PORT environment variable) and that's it!<br><br>
+To run the tests:<br><br>
 ```npm test```<br><br>
 
 ## License
 MIT license.<br><br>
 
 ## Information
-Author： &nbsp;GW19 &nbsp;<br>
-如果您認為程式碼有任何需要改進的地方拜託告訴我，我會非常感謝您！ <br><br>
-
+Author: &nbsp;GW19 &nbsp;<br>
+If you think any part of the code could be improved, please do tell me — I would be very grateful!<br><br>

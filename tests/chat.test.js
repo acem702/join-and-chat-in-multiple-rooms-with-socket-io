@@ -164,12 +164,12 @@ test('joining a new room reports it as created, joining again as joined', async 
   t.after(() => { alice.close(); bob.close(); });
 
   const aliceResult = waitFor(alice, 'join left result');
-  alice.emit('join room', '技術討論');
-  assert.equal((await aliceResult).logAction, '已經建立');
+  alice.emit('join room', 'Tech Talk');
+  assert.equal((await aliceResult).logAction, 'created ');
 
   const bobResult = waitFor(bob, 'join left result');
-  bob.emit('join room', '技術討論');
-  assert.equal((await bobResult).logAction, '已經加入');
+  bob.emit('join room', 'Tech Talk');
+  assert.equal((await bobResult).logAction, 'joined ');
 });
 
 test('room occupancy tracks moves, and empty rooms disappear while the lobby stays', async t => {
@@ -179,13 +179,13 @@ test('room occupancy tracks moves, and empty rooms disappear while the lobby sta
   const alice = await login(srv.url, 'Alice');
   t.after(() => alice.close());
 
-  let rooms = await joinRoom(alice, '技術討論');
-  assert.equal(rooms['技術討論'], 1);
+  let rooms = await joinRoom(alice, 'Tech Talk');
+  assert.equal(rooms['Tech Talk'], 1);
   assert.equal(rooms[LOBBY], 0, 'lobby is kept even when empty');
 
-  rooms = await joinRoom(alice, '閒聊');
-  assert.equal(rooms['閒聊'], 1);
-  assert.ok(!('技術討論' in rooms), 'the vacated room is dropped from the list');
+  rooms = await joinRoom(alice, 'Small Talk');
+  assert.equal(rooms['Small Talk'], 1);
+  assert.ok(!('Tech Talk' in rooms), 'the vacated room is dropped from the list');
 });
 
 // This is the bug visible in the original: only sockets inside the two rooms
@@ -199,14 +199,14 @@ test('a room change refreshes the list for uninvolved users too', async t => {
   t.after(() => { alice.close(); bob.close(); });
 
   // Alice stays in the lobby; Bob hops through two rooms she is not in.
-  await joinRoom(bob, '技術討論');
+  await joinRoom(bob, 'Tech Talk');
 
   const aliceSees = roomsOf(alice);
-  bob.emit('join room', '閒聊');
+  bob.emit('join room', 'Small Talk');
   const rooms = await aliceSees;
 
-  assert.equal(rooms['閒聊'], 1);
-  assert.ok(!('技術討論' in rooms),
+  assert.equal(rooms['Small Talk'], 1);
+  assert.ok(!('Tech Talk' in rooms),
     'Alice should not still be shown the room Bob left');
 });
 
@@ -218,13 +218,13 @@ test('counts recover after a disconnect', async t => {
   t.after(() => alice.close());
 
   const bob = await login(srv.url, 'Bob');
-  await joinRoom(bob, '技術討論');
+  await joinRoom(bob, 'Tech Talk');
 
   const afterLeave = roomsOf(alice);
   bob.close();
   const rooms = await afterLeave;
 
-  assert.ok(!('技術討論' in rooms), 'room emptied by the disconnect is gone');
+  assert.ok(!('Tech Talk' in rooms), 'room emptied by the disconnect is gone');
   assert.equal(rooms[LOBBY], 1, 'lobby count never goes negative');
 });
 
@@ -237,8 +237,8 @@ test('messages only reach the sender\'s room', async t => {
   const carol = await login(srv.url, 'Carol');
   t.after(() => { alice.close(); bob.close(); carol.close(); });
 
-  await joinRoom(alice, '技術討論');
-  await joinRoom(bob, '技術討論');
+  await joinRoom(alice, 'Tech Talk');
+  await joinRoom(bob, 'Tech Talk');
 
   const bobGets = waitFor(bob, 'new message');
   alice.emit('new message', 'hello room');
@@ -257,7 +257,7 @@ test('typing and stop typing are both scoped to the room', async t => {
   const carol = await login(srv.url, 'Carol');
   t.after(() => { alice.close(); carol.close(); });
 
-  await joinRoom(alice, '技術討論');
+  await joinRoom(alice, 'Tech Talk');
 
   alice.emit('typing');
   await expectNoEvent(carol, 'typing');
@@ -323,6 +323,18 @@ test('a valid room name containing spaces is normalised, not rejected', async t 
   const rooms = await joinRoom(alice, 'my  room ', 'my room');
   assert.equal(rooms['my room'], 1,
     'internal whitespace collapsed and ends trimmed');
+});
+
+// The interface is in English, but the rules still accept Chinese names.
+test('Chinese room names are still accepted', async t => {
+  const srv = await startServer();
+  t.after(() => srv.close());
+
+  const alice = await login(srv.url, 'Alice');
+  t.after(() => alice.close());
+
+  const rooms = await joinRoom(alice, '\u6280\u8853\u8a0e\u8ad6');
+  assert.equal(rooms['\u6280\u8853\u8a0e\u8ad6'], 1);
 });
 
 test('oversized messages are dropped', async t => {

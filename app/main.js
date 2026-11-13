@@ -51,9 +51,9 @@ $(function() {
     }
 
     if (data.numUsers === 1) {
-      log('目前只有你一個人在這裡唷！');
+      log('You are the only one here right now!');
     } else {
-      log('目前總共有 ' + data.numUsers + ' 位旅客在聊天實驗室。');
+      log('There are ' + data.numUsers + ' visitors in the chat lab.');
     }
   }
 
@@ -122,8 +122,8 @@ $(function() {
           //noinspection JSUnresolvedVariable
           $roomList[0].scrollTop = $roomList[0].scrollHeight;
         } else {
-          log('房間名稱長度限制為 1～14 個字元，' +
-              '並只能由中文、英文、數字及底線所組成');
+          log('Room names must be 1-14 characters, using only letters, ' +
+              'digits, underscores and Chinese characters');
         }
         break;
 
@@ -133,7 +133,7 @@ $(function() {
         break;
 
       default:
-        log('您輸入了無效的指令');
+        log('That command is not recognised');
         break;
     }
   }
@@ -196,7 +196,7 @@ $(function() {
   // Adds the visual chat typing message
   function addChatTyping (data) {
     data.typing = true;
-    data.message = '正在輸入訊息...';
+    data.message = 'is typing...';
     addChatMessage(data);
   }
 
@@ -332,7 +332,7 @@ $(function() {
 
     $btnCollapse
       .attr('aria-expanded', collapsed ? 'false' : 'true')
-      .attr('title', collapsed ? '展開房間列表' : '收合房間列表')
+      .attr('title', collapsed ? 'Expand room list' : 'Collapse room list')
       .html(collapsed ? '&raquo;' : '&laquo;');
 
     $inputMessage.focus();
@@ -344,7 +344,7 @@ $(function() {
   socket.on('login', function (data) {
     connected = true;
     // Display the welcome message
-    log('● 歡迎來到聊天實驗室 ●', {
+    log('● Welcome to the Chat Lab ●', {
       prepend: true
     });
     addParticipantsMessage(data);
@@ -386,24 +386,24 @@ $(function() {
 
   // Server rejected a username, room name or message.
   socket.on('invalid input', function (data) {
-    log(data && data.message ? data.message : '您輸入了無效的內容');
+    log(data && data.message ? data.message : 'That input is not valid');
   });
 
   socket.on('disconnect', function () {
     connected = false;
-    log('您已經中斷連線');
+    log('You have been disconnected');
   });
 
   // Reconnection lives on the manager in Socket.IO 4, not on the socket.
   socket.io.on('reconnect', function () {
-    log('您已經重新連線');
+    log('You are reconnected');
     if (username) {
       socket.emit('add user', username);
     }
   });
 
   socket.io.on('reconnect_error', function () {
-    log('重新連線失敗...');
+    log('Reconnection failed...');
   });
 
   // Show current room list.
@@ -415,7 +415,7 @@ $(function() {
       // other users and would otherwise be injected into everyone's page.
       var $roomName = $('<b/>').text(roomName);
       var $roomCount = $('<span class="user-number-in-room"/>')
-        .text('(' + numUserInRoom + '人)');
+        .text(numUserInRoom === 1 ? '(1 user)' : '(' + numUserInRoom + ' users)');
 
       var $roomDiv = $('<div class="room"/>')
         .append($roomName, $roomCount)

@@ -12,14 +12,21 @@ const rules = require('../app/chat-rules.js');
 
 const LOBBY = rules.LOBBY;
 
-// Action labels used to build the log lines shown in the chat body.
-const logCreate = '已經建立';
-const logJoin = '已經加入';
-const logLeft = '已經離開';
+// Action labels used to build the log lines shown in the chat body. They are
+// concatenated as <username> + action + location + roomName, so the trailing
+// spaces are load bearing.
+const logCreate = 'created ';
+const logJoin = 'joined ';
+const logLeft = 'left ';
 
 // Location labels: the lab is the site as a whole, a room is inside it.
-const logLab = '聊天實驗室';
-const logRoom = '房間 ';
+const logLab = 'the chat lab';
+const logRoom = 'room ';
+
+// Wraps a room name where it appears inside a log line.
+function quoteRoom (roomName) {
+  return '"' + roomName + '"';
+}
 
 function createApp () {
   const app = express();
@@ -125,7 +132,7 @@ function createApp () {
       if (!rules.isValidUsername(name)) {
         socket.emit('invalid input', {
           field: 'username',
-          message: '暱稱需為 1～14 個字元，且不可為空白'
+          message: 'Your nickname must be 1-14 characters and cannot be blank'
         });
         return;
       }
@@ -219,8 +226,8 @@ function createApp () {
       if (!rules.isValidRoomName(target)) {
         socket.emit('invalid input', {
           field: 'room',
-          message: '房間名稱長度限制為 1～14 個字元，' +
-            '並只能由中文、英文、數字及底線所組成'
+          message: 'Room names must be 1-14 characters, using only letters, ' +
+            'digits, underscores and Chinese characters'
         });
         return;
       }
@@ -242,7 +249,7 @@ function createApp () {
         numUsers: userCount(),
         logAction: logLeft,
         logLocation: logRoom,
-        roomName: '「' + previous + '」',
+        roomName: quoteRoom(previous),
         userJoinOrLeftRoom: true
       });
 
@@ -253,10 +260,10 @@ function createApp () {
       socket.data.currentRoom = target;
 
       socket.emit('join left result', {
-        username: '您',
+        username: 'You ',
         logAction: isNewRoom ? logCreate : logJoin,
         logLocation: logRoom,
-        roomName: '「' + target + '」'
+        roomName: quoteRoom(target)
       });
 
       socket.broadcast.to(target).emit('user joined', {
@@ -264,7 +271,7 @@ function createApp () {
         numUsers: userCount(),
         logAction: logJoin,
         logLocation: logRoom,
-        roomName: '「' + target + '」',
+        roomName: quoteRoom(target),
         userJoinOrLeftRoom: true
       });
 

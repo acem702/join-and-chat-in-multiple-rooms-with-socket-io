@@ -15,15 +15,16 @@
   'use strict';
 
   // The default room every user lands in. It is never deleted, even when empty.
-  var LOBBY = '大廳';
+  var LOBBY = 'Lobby';
 
   var MAX_NAME_LENGTH = 14;
   var MAX_MESSAGE_LENGTH = 2000;
 
-  // Room names: 1-14 characters, not blank, limited to Chinese characters,
-  // ASCII letters, digits, underscore and whitespace.
+  // Room names: 1-14 characters, not blank, limited to ASCII letters,
+  // digits, underscore, whitespace and Chinese characters. The interface is
+  // in English but Chinese room names are still accepted.
   var ROOM_NAME_RULE =
-    /^(?!\s*$)[a-zA-Z0-9_一-龥 \f\n\r\t\v]{1,14}$/;
+    /^(?!\s*$)[a-zA-Z0-9_\u4e00-\u9fa5 \f\n\r\t\v]{1,14}$/;
 
   // Usernames: 1-14 characters, not blank, no control characters.
   var USERNAME_RULE = /^(?!\s*$)[^\u0000-\u001f\u007f]{1,14}$/;
