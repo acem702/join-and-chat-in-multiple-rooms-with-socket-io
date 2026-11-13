@@ -113,10 +113,12 @@ function createApp () {
         return;
       }
 
-      // we tell the client to execute 'new message'
+      // we tell the client to execute 'new message'. The timestamp is set
+      // here so every recipient shows the same time for a message.
       socket.broadcast.to(socket.data.currentRoom).emit('new message', {
         username: socket.data.username,
-        message: data
+        message: data,
+        time: Date.now()
       });
     });
 

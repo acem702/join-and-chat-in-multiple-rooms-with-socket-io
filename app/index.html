@@ -13,9 +13,6 @@
   <script>try{Typekit.load({ async: true });}catch(e){}</script>
 
   <script src='https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script>
-  <link rel="stylesheet"
-        href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/base/jquery-ui.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
 
   <script src='/socket.io/socket.io.js'></script>
   <script src='/chat-rules.js'></script>
@@ -27,12 +24,18 @@
 
     <li class='chat page' id='chat-page'>
       <div class='chatArea'>
-        <ul class='messages'></ul>
+        <ul class='messages' id='messages'
+            role='log' aria-live='polite' aria-relevant='additions'
+            aria-label='Chat messages'></ul>
       </div>
 
-      <button class='btn btn-tips' type='button' title='Tips'>?</button>
+      <button class='btn btn-tips' type='button' title='Tips'
+              aria-expanded='false' aria-controls='effect-tips'>
+        <span aria-hidden='true'>?</span>
+        <span class='visually-hidden'>Tips</span>
+      </button>
 
-      <div id='effect-tips' class='ui-tips'>
+      <div id='effect-tips' class='ui-tips' hidden>
         <h3 class='tips-title'>Tips</h3>
         <div class='tips'>
           <h3>Commands</h3>
@@ -53,31 +56,61 @@
         </div>
       </div>
 
-      <input class='inputMessage' placeholder='Type your message here'/>
+      <!-- Shown only below the breakpoint, where the room list is a drawer
+           and its own toggle has slid off screen with it. -->
+      <button class='btn btn-rooms-toggle' type='button'
+              title='Show room list' aria-expanded='false'
+              aria-controls='room-page'>
+        <span aria-hidden='true'>&#9776;</span>
+        <span class='visually-hidden'>Show room list</span>
+      </button>
+
+      <label class='visually-hidden' for='message-input'>Message</label>
+      <input class='inputMessage' id='message-input' autocomplete='off'
+             placeholder='Type your message here'/>
     </li>
 
     <li class='login page' id='login-page'>
       <div class='form'>
         <h1 class='title'>Chat Lab</h1>
-        <h3 class='subtitle'>Please enter your nickname</h3>
-        <label>
-          <input class='usernameInput' type='text' minlength='1' maxlength='14'
-                 title='Your nickname must be 1 to 14 characters' autofocus/>
+        <label class='subtitle' for='username-input'>
+          Please enter your nickname
         </label>
+        <input class='usernameInput' id='username-input' type='text'
+               minlength='1' maxlength='14' autocomplete='off'
+               aria-describedby='username-hint'
+               title='Your nickname must be 1 to 14 characters' autofocus/>
+        <p class='login-hint' id='username-hint'>
+          1 to 14 characters. Press Enter to join.
+        </p>
       </div>
     </li>
 
-    <li class='room page' id='room-page'>
+    <li class='room page' id='room-page' aria-label='Rooms'>
       <button class='btn btn-collapse' type='button'
               title='Collapse room list' aria-expanded='true'
-              aria-controls='room-page'>&laquo;</button>
+              aria-controls='room-page'>
+        <span class='collapse-icon' aria-hidden='true'>&laquo;</span>
+        <span class='visually-hidden'>Collapse room list</span>
+      </button>
       <span class='room-rail-label' aria-hidden='true'>Rooms</span>
-      <h1 class='room-title'>Room List</h1>
-      <p class='room-hint'>Click a room to join it</p>
-      <ul class='room-list'></ul>
+
+      <div class='room-panel-body'>
+        <h1 class='room-title'>Room List</h1>
+        <p class='room-hint'>Click a room to join it</p>
+
+        <label class='visually-hidden' for='room-filter'>Filter rooms</label>
+        <input class='room-filter' id='room-filter' type='search'
+               autocomplete='off' placeholder='Filter rooms'/>
+
+        <ul class='room-list'></ul>
+        <p class='room-empty' hidden>No rooms match that filter.</p>
+      </div>
     </li>
 
   </ul>
+
+  <div class='drawer-scrim' hidden></div>
 
 </body>
 </html>
