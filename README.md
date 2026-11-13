@@ -12,11 +12,11 @@ In <strong> join-and-chat </strong>, you sign in with a nickname and are placed 
 
 <li>Type the command <b>/join [room name]</b> to create a room, or to join it if it already exists.</li>
 
-<li>As well as the /join command, you can click any room in the list on the right to join it directly. The room on a red background is the one you are currently in, and the number in brackets is how many people are in it.</li>
+<li>As well as the /join command, you can click any room in the list on the right to join it directly. The highlighted room is the one you are currently in, and the number beside each room is how many people are in it. A filter box narrows a long list, and Enter joins the first match.</li>
 
 <li>The command <b>/ls</b> refreshes the room list. It also refreshes automatically every 30 seconds, and immediately for everyone whenever someone joins or leaves the chat lab or a room.</li>
 
-<li>The room list can be collapsed to a narrow rail with the « button at its top left, giving the chat panel the full width.</li>
+<li>The room list can be collapsed to a narrow rail with the « button at the top of the panel, giving the conversation the full width. On a narrow screen it becomes a drawer instead.</li>
 
 </ol>
 <br>

@@ -2,8 +2,8 @@
 // Based on Socket.IO
 
 $(function() {
-  var FADE_TIME = 150; // ms
   var TYPING_TIMER_LENGTH = 400; // ms
+  var TYPING_EXPIRY = 7000; // ms, in case a 'stop typing' never arrives
   var ROOM_LIST_REFRESH = 30000; // ms
   var NEAR_BOTTOM_SLACK = 80; // px
   var MOBILE_QUERY = '(max-width: 719px)';
@@ -11,15 +11,16 @@ $(function() {
   var KEY_ENTER = 13;
   var KEY_ESCAPE = 27;
 
+  // Name colours, chosen to stay legible on the dark chat surface.
   var COLORS = [
-    '#e21400', '#91580f', '#f8a700', '#f78b00',
-    '#58dc00', '#287b00', '#008dff', '#4ae8c4',
-    '#3b88eb', '#3824aa', '#a700ff', '#d300e7',
-    '#CC9014', '#FF6C00', '#7900ff', '#14CC78',
-    '#001bff', '#00b2d8', '#7900ff', '#00d877',
-    '#4d7298', '#795da3', '#f47577', '#db324d',
-    '#EE4035', '#F3A530', '#56B949', '#30499B',
-    '#F3A530', '#56B949', '#844D9E', '#4e1c81'
+    '#ff6b6b', '#ffa94d', '#ffd43b', '#a9e34b',
+    '#51cf66', '#38d9a9', '#3bc9db', '#4dabf7',
+    '#748ffc', '#9775fa', '#da77f2', '#f783ac',
+    '#ff8787', '#ffc078', '#ffe066', '#c0eb75',
+    '#69db7c', '#63e6be', '#66d9e8', '#74c0fc',
+    '#91a7ff', '#b197fc', '#e599f7', '#faa2c1',
+    '#ffa8a8', '#ffd8a8', '#f0c674', '#e9c46a',
+    '#5ec2b7', '#8ecae6', '#bde0fe', '#d0bfff'
   ];
 
   // Validation rules shared with the server (app/chat-rules.js). The server
@@ -28,18 +29,20 @@ $(function() {
 
   // Initialize variables
   var $window = $(window);
-  var $usernameInput = $('.usernameInput'); // Input for username
-  var $messages = $('.messages'); // Messages area
-  var $inputMessage = $('.inputMessage'); // Input message input box
+  var $usernameInput = $('.usernameInput');
+  var $messages = $('.messages');
+  var $inputMessage = $('.inputMessage');
 
-  var $pages = $('.pages'); // Flex row holding both panels
-  var $loginPage = $('.login.page'); // login page
-  var $chatPage = $('.chat.page'); // Chat room page
-  var $roomPage = $('.room.page'); // Room list page
-  var $roomList = $('.room-list'); // Room list <ul>
-  var $roomFilter = $('.room-filter'); // Filters the room list
-  var $roomEmpty = $('.room-empty'); // Shown when the filter matches nothing
-  var $scrim = $('.drawer-scrim'); // Backdrop behind the mobile drawer
+  var $pages = $('.pages');
+  var $loginPage = $('.login.page');
+  var $roomList = $('.room-list');
+  var $roomFilter = $('.room-filter');
+  var $roomEmpty = $('.room-empty');
+  var $scrim = $('.drawer-scrim');
+
+  var $headerTitle = $('.chat-header-title');
+  var $headerMeta = $('.chat-header-meta');
+  var $typingIndicator = $('.typing-indicator');
 
   var $btnTips = $('.btn-tips');
   var $tips = $('#effect-tips');
@@ -57,6 +60,9 @@ $(function() {
   // without asking for it again.
   var roomState = { current: null, rooms: {} };
 
+  // Who is currently typing in this room: name -> expiry timer.
+  var typingUsers = {};
+
   var socket = io();
 
   function isMobile () {
@@ -71,15 +77,14 @@ $(function() {
     }
 
     if (data.numUsers === 1) {
-      log('You are the only one here right now!');
+      log('You are the only one here right now.');
     } else {
-      log('There are ' + data.numUsers + ' visitors in the chat lab.');
+      log('There are ' + data.numUsers + ' people in the chat lab.');
     }
   }
 
   // Sets the client's username
   function setUsername () {
-    // trim(): remove the whitespace from the beginning and end of a string.
     username = rules.normalizeName($usernameInput.val());
 
     if (!rules.isValidUsername(username)) {
@@ -87,11 +92,10 @@ $(function() {
       return;
     }
 
-    $loginPage.fadeOut();
-    $chatPage.show();
-    $roomPage.fadeIn();
+    $pages.addClass('signed-in');
     $loginPage.off('click');
-    $currentInput = $inputMessage.focus();
+    $currentInput = $inputMessage;
+    $inputMessage.focus();
 
     // Tell the server your username
     socket.emit('add user', username);
@@ -165,7 +169,7 @@ $(function() {
     if (isNaN(date.getTime())) {
       date = new Date();
     }
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   }
 
   // True when the reader is at the foot of the transcript. If they have
@@ -185,25 +189,24 @@ $(function() {
     var $last = $messages.children().last();
     return $last.length > 0 &&
       $last.hasClass('message') &&
-      !$last.hasClass('typing') &&
       $last.data('author') === author;
   }
 
   // Log a message
   function log (message, options) {
     options = options || {};
-    var $logDiv;
+    var $logDiv = $('<li>').addClass('log');
 
     if (typeof options.userConnEvent !== 'undefined') {
       var userName = options.username;
-      var $usernameDiv = $('<span class="username">')
-        .text(userName)
-        .css('color', getUsernameColor(userName));
-      $logDiv = $('<li>')
-        .addClass('log')
-        .append($usernameDiv, message);
+      $logDiv.append(
+        $('<span class="username">')
+          .text(userName)
+          .css('color', getUsernameColor(userName)),
+        $('<span>').text(message)
+      );
     } else {
-      $logDiv = $('<li>').addClass('log').text(message);
+      $logDiv.append($('<span>').text(message));
     }
 
     addMessageElement($logDiv, options);
@@ -211,65 +214,43 @@ $(function() {
 
   // Adds the visual chat message to the message list
   function addChatMessage (data, options) {
-    // Don't fade the message in if there is an 'X was typing'
-    var $typingMessages = getTypingMessages(data);
     options = options || {};
-    if ($typingMessages.length !== 0) {
-      options.fade = false;
-      $typingMessages.remove();
-    }
 
-    if (data.message === '') {
+    if (!data.message) {
       return;
     }
 
     var author = data.username;
-    var isTyping = data.typing === true;
-    var grouped = !isTyping && continuesRunFrom(author);
+    var grouped = continuesRunFrom(author);
 
-    var $usernameDiv = $('<span class="username"/>')
-      .text(grouped ? '' : author + (isTyping ? '' : ':'))
-      .css('color', grouped ? '' : getUsernameColor(author));
+    var $time = $('<time class="message-time"/>')
+      .attr('datetime', new Date(data.time || Date.now()).toISOString())
+      .text(formatTime(data.time));
 
-    var $messageBodyDiv = $('<span class="messageBody">')
-      .text(data.message);
+    var $messageBody = $('<div class="messageBody"/>').text(data.message);
 
-    var $messageDiv = $('<li class="message"/>')
-      .data('author', author)
-      .append($usernameDiv, $messageBodyDiv);
+    var $messageDiv = $('<li class="message"/>').data('author', author);
 
-    if (isTyping) {
-      $messageDiv.addClass('typing');
+    if (grouped) {
+      // Continuation line: no name, and the time only on hover.
+      $messageDiv.addClass('grouped').append($time, $messageBody);
     } else {
       $messageDiv.append(
-        $('<time class="message-time"/>')
-          .attr('datetime', new Date(data.time || Date.now()).toISOString())
-          .text(formatTime(data.time))
+        $('<div class="message-meta"/>').append(
+          $('<span class="username"/>')
+            .text(author)
+            .css('color', getUsernameColor(author)),
+          $time
+        ),
+        $messageBody
       );
     }
 
-    if (grouped) {
-      $messageDiv.addClass('grouped');
-    }
     if (data.own) {
       $messageDiv.addClass('own');
     }
 
     addMessageElement($messageDiv, options);
-  }
-
-  // Adds the visual chat typing message
-  function addChatTyping (data) {
-    data.typing = true;
-    data.message = 'is typing...';
-    addChatMessage(data);
-  }
-
-  // Removes the visual chat typing message
-  function removeChatTyping (data) {
-    getTypingMessages(data).fadeOut(FADE_TIME, function () {
-      $(this).remove();
-    });
   }
 
   // Adds a message element to the messages and scrolls to the bottom
@@ -280,7 +261,6 @@ $(function() {
   function addMessageElement (el, options) {
     var $el = $(el);
 
-    // Setup default options
     if (!options) {
       options = {};
     }
@@ -294,7 +274,7 @@ $(function() {
     var follow = isNearBottom();
 
     // Entry is animated by CSS. jQuery's fadeIn would write an inline
-    // display onto the element and break the flex row inside it.
+    // display onto the element and break the layout inside it.
     if (!options.fade) {
       $el.addClass('no-animate');
     }
@@ -309,6 +289,61 @@ $(function() {
     if (follow || $el.hasClass('own')) {
       scrollToBottom();
     }
+  }
+
+  // --- Typing indicator -----------------------------------------------------
+  //
+  // Shown above the composer rather than as a line in the transcript, so it
+  // does not scroll away or push the conversation around.
+
+  function renderTyping () {
+    var names = Object.keys(typingUsers);
+    var text;
+
+    if (names.length === 0) {
+      $typingIndicator.prop('hidden', true).text('');
+      return;
+    }
+
+    if (names.length === 1) {
+      text = names[0] + ' is typing…';
+    } else if (names.length === 2) {
+      text = names[0] + ' and ' + names[1] + ' are typing…';
+    } else {
+      text = 'Several people are typing…';
+    }
+
+    $typingIndicator.prop('hidden', false).text(text);
+  }
+
+  function setUserTyping (name) {
+    if (!name) {
+      return;
+    }
+    if (typingUsers[name]) {
+      clearTimeout(typingUsers[name]);
+    }
+    typingUsers[name] = setTimeout(function () {
+      clearUserTyping(name);
+    }, TYPING_EXPIRY);
+    renderTyping();
+  }
+
+  function clearUserTyping (name) {
+    if (!name || !typingUsers[name]) {
+      return;
+    }
+    clearTimeout(typingUsers[name]);
+    delete typingUsers[name];
+    renderTyping();
+  }
+
+  function clearAllTyping () {
+    Object.keys(typingUsers).forEach(function (name) {
+      clearTimeout(typingUsers[name]);
+    });
+    typingUsers = {};
+    renderTyping();
   }
 
   // Updates the typing event
@@ -331,16 +366,6 @@ $(function() {
         typing = false;
       }
     }, TYPING_TIMER_LENGTH);
-  }
-
-  // Gets the 'X is typing' messages of a user
-  function getTypingMessages (data) {
-    if (!data || typeof data.username === 'undefined') {
-      return $();
-    }
-    return $('.typing.message').filter(function () {
-      return $(this).data('author') === data.username;
-    });
   }
 
   // Gets the color of a username.
@@ -367,7 +392,7 @@ $(function() {
   }
 
   function describeOccupancy (count) {
-    return count === 1 ? '(1 user)' : '(' + count + ' users)';
+    return count === 1 ? '1 person' : count + ' people';
   }
 
   function visibleRoomNames () {
@@ -392,12 +417,16 @@ $(function() {
       var $roomName = $('<span class="room-name"/>')
         .text(roomName)
         .attr('title', roomName);
-      var $roomCount = $('<span class="user-number-in-room"/>')
-        .text(describeOccupancy(roomState.rooms[roomName]));
+      var $roomCount = $('<span class="room-count"/>')
+        .text(roomState.rooms[roomName]);
 
       // A real button, so it is reachable and operable from the keyboard.
       var $roomButton = $('<button type="button" class="room-card"/>')
-        .append($roomName, $roomCount)
+        .append(
+          $('<span class="room-hash" aria-hidden="true"/>').text('#'),
+          $roomName,
+          $roomCount
+        )
         .attr('aria-current', isCurrent ? 'true' : null)
         .on('click', function () {
           joinRoom(roomName);
@@ -411,6 +440,18 @@ $(function() {
     });
 
     $roomEmpty.prop('hidden', names.length > 0);
+  }
+
+  function renderHeader () {
+    var room = roomState.current;
+    if (!room) {
+      return;
+    }
+    var count = roomState.rooms[room];
+
+    $headerTitle.text(room);
+    $headerMeta.text(typeof count === 'number' ? describeOccupancy(count) : '');
+    $inputMessage.attr('placeholder', 'Message #' + room);
   }
 
   function joinRoom (roomName) {
@@ -505,11 +546,6 @@ $(function() {
     $currentInput.focus();
   });
 
-  // Focus input when clicking on the message input's border
-  $inputMessage.click(function () {
-    $inputMessage.focus();
-  });
-
   $roomFilter.on('input', renderRoomList);
 
   // Enter in the filter joins the first room still showing.
@@ -564,22 +600,17 @@ $(function() {
 
   // --- Socket events --------------------------------------------------------
 
-  // Whenever the server emits 'login', log the login message
   socket.on('login', function (data) {
     connected = true;
-    // Display the welcome message
-    log('● Welcome to the Chat Lab ●', {
-      prepend: true
-    });
+    log('Welcome to the Chat Lab.', { prepend: true });
     addParticipantsMessage(data);
   });
 
-  // Whenever the server emits 'new message', update the chat body
   socket.on('new message', function (data) {
+    clearUserTyping(data.username);
     addChatMessage(data);
   });
 
-  // Whenever the server emits 'user joined', log it in the chat body
   socket.on('user joined', function (data) {
     log(data.logAction + data.logLocation + data.roomName, {
       userConnEvent: true,
@@ -588,24 +619,21 @@ $(function() {
     addParticipantsMessage(data);
   });
 
-  // Whenever the server emits 'user left', log it in the chat body
   socket.on('user left', function (data) {
+    clearUserTyping(data.username);
     log(data.logAction + data.logLocation + data.roomName, {
       userConnEvent: true,
       username: data.username
     });
     addParticipantsMessage(data);
-    removeChatTyping(data);
   });
 
-  // Whenever the server emits 'typing', show the typing message
   socket.on('typing', function (data) {
-    addChatTyping(data);
+    setUserTyping(data && data.username);
   });
 
-  // Whenever the server emits 'stop typing', kill the typing message
   socket.on('stop typing', function (data) {
-    removeChatTyping(data);
+    clearUserTyping(data && data.username);
   });
 
   // Server rejected a username, room name or message.
@@ -615,6 +643,7 @@ $(function() {
 
   socket.on('disconnect', function () {
     connected = false;
+    clearAllTyping();
     log('You have been disconnected');
   });
 
@@ -627,18 +656,23 @@ $(function() {
   });
 
   socket.io.on('reconnect_error', function () {
-    log('Reconnection failed...');
+    log('Reconnection failed…');
   });
 
   // Show current room list.
   socket.on('show room list', function (room, rooms) {
+    if (room !== roomState.current) {
+      // Different room, so whoever was typing in the old one is no longer
+      // anything to do with us.
+      clearAllTyping();
+    }
     roomState.current = room;
     roomState.rooms = rooms || {};
     renderRoomList();
+    renderHeader();
   });
 
   socket.on('join left result', function (data) {
-    // log results.
     log(data.username + data.logAction
       + data.logLocation + data.roomName);
   });

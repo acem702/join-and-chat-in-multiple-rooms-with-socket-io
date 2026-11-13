@@ -6,11 +6,9 @@
 <head>
   <meta charset='UTF-8'>
   <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <meta name='color-scheme' content='dark'>
   <title>Join and Chat</title>
   <link href='style.css' rel='stylesheet' >
-
-  <script src="https://use.typekit.net/ama5eep.js"></script>
-  <script>try{Typekit.load({ async: true });}catch(e){}</script>
 
   <script src='https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script>
 
@@ -23,63 +21,77 @@
   <ul class='pages' id='all-page'>
 
     <li class='chat page' id='chat-page'>
+
+      <header class='chat-header'>
+        <span class='channel-hash' aria-hidden='true'>#</span>
+        <h1 class='chat-header-title'>Lobby</h1>
+        <span class='chat-header-divider' aria-hidden='true'></span>
+        <span class='chat-header-meta'></span>
+
+        <div class='chat-header-actions'>
+          <button class='icon-btn btn-tips' type='button' title='Tips'
+                  aria-expanded='false' aria-controls='effect-tips'>
+            <span aria-hidden='true'>?</span>
+            <span class='visually-hidden'>Tips</span>
+          </button>
+          <!-- Below the breakpoint the room list is a drawer, and its own
+               toggle has slid off screen with it. -->
+          <button class='icon-btn btn-rooms-toggle' type='button'
+                  title='Show room list' aria-expanded='false'
+                  aria-controls='room-page'>
+            <span aria-hidden='true'>&#9776;</span>
+            <span class='visually-hidden'>Show room list</span>
+          </button>
+        </div>
+      </header>
+
       <div class='chatArea'>
         <ul class='messages' id='messages'
             role='log' aria-live='polite' aria-relevant='additions'
             aria-label='Chat messages'></ul>
       </div>
 
-      <button class='btn btn-tips' type='button' title='Tips'
-              aria-expanded='false' aria-controls='effect-tips'>
-        <span aria-hidden='true'>?</span>
-        <span class='visually-hidden'>Tips</span>
-      </button>
+      <div class='composer'>
+        <p class='typing-indicator' aria-live='polite'></p>
+        <label class='visually-hidden' for='message-input'>Message</label>
+        <input class='inputMessage' id='message-input' autocomplete='off'
+               placeholder='Message #Lobby'/>
+      </div>
 
       <div id='effect-tips' class='ui-tips' hidden>
-        <h3 class='tips-title'>Tips</h3>
+        <h2 class='tips-title'>Tips</h2>
         <div class='tips'>
           <h3>Commands</h3>
-          <h4>/join [room name] — create or join a room</h4>
-          (Room names are 1 to 14 characters, using only letters,
-          digits, underscores and Chinese characters)<br><br>
-          <h4>/ls — refresh the room list</h4>
-          (The list refreshes automatically every 30 seconds, and
-          immediately whenever anyone joins or leaves a room)<br><br>
-          <h4>Collapsing the room list</h4>
-          (Use the « button at the top left of the room list to collapse
-          or expand the right-hand panel)<br>
-          <br>
-          Author: &nbsp;GW19 &nbsp;
-          &lt; <a href='mailto:imgw19@gmail.com'>imgw19@gmail.com</a> &gt;<br>
-          GitHub: <a href='https://github.com/gw19/join-and-chat'
-                    target='_blank' rel='noopener'>join-and-chat</a>
+          <h4>/join [room name]</h4>
+          <p>Create a room, or join it if it already exists. Names are 1 to
+          14 characters, using only letters, digits, underscores and
+          Chinese characters.</p>
+          <h4>/ls</h4>
+          <p>Refresh the room list. It also refreshes on its own every 30
+          seconds, and immediately whenever anyone joins or leaves.</p>
+          <h4 class='tips-plain'>Collapsing the room list</h4>
+          <p>Use the « button at the top of the room list to collapse or
+          expand the right-hand panel.</p>
+          <p class='tips-credit'>
+            Author: GW19
+            &lt;<a href='mailto:imgw19@gmail.com'>imgw19@gmail.com</a>&gt;<br>
+            GitHub: <a href='https://github.com/gw19/join-and-chat'
+                      target='_blank' rel='noopener'>join-and-chat</a>
+          </p>
         </div>
       </div>
 
-      <!-- Shown only below the breakpoint, where the room list is a drawer
-           and its own toggle has slid off screen with it. -->
-      <button class='btn btn-rooms-toggle' type='button'
-              title='Show room list' aria-expanded='false'
-              aria-controls='room-page'>
-        <span aria-hidden='true'>&#9776;</span>
-        <span class='visually-hidden'>Show room list</span>
-      </button>
-
-      <label class='visually-hidden' for='message-input'>Message</label>
-      <input class='inputMessage' id='message-input' autocomplete='off'
-             placeholder='Type your message here'/>
     </li>
 
     <li class='login page' id='login-page'>
       <div class='form'>
         <h1 class='title'>Chat Lab</h1>
-        <label class='subtitle' for='username-input'>
-          Please enter your nickname
-        </label>
+        <p class='login-lede'>Pick a nickname and start talking.</p>
+        <label class='visually-hidden' for='username-input'>Nickname</label>
         <input class='usernameInput' id='username-input' type='text'
                minlength='1' maxlength='14' autocomplete='off'
-               aria-describedby='username-hint'
-               title='Your nickname must be 1 to 14 characters' autofocus/>
+               placeholder='Your nickname'
+               aria-describedby='username-hint' autofocus/>
         <p class='login-hint' id='username-hint'>
           1 to 14 characters. Press Enter to join.
         </p>
@@ -87,18 +99,20 @@
     </li>
 
     <li class='room page' id='room-page' aria-label='Rooms'>
-      <button class='btn btn-collapse' type='button'
-              title='Collapse room list' aria-expanded='true'
-              aria-controls='room-page'>
-        <span class='collapse-icon' aria-hidden='true'>&laquo;</span>
-        <span class='visually-hidden'>Collapse room list</span>
-      </button>
+
+      <header class='room-header'>
+        <button class='icon-btn btn-collapse' type='button'
+                title='Collapse room list' aria-expanded='true'
+                aria-controls='room-page'>
+          <span class='collapse-icon' aria-hidden='true'>&laquo;</span>
+          <span class='visually-hidden'>Collapse room list</span>
+        </button>
+        <h2 class='room-header-title'>Rooms</h2>
+      </header>
+
       <span class='room-rail-label' aria-hidden='true'>Rooms</span>
 
       <div class='room-panel-body'>
-        <h1 class='room-title'>Room List</h1>
-        <p class='room-hint'>Click a room to join it</p>
-
         <label class='visually-hidden' for='room-filter'>Filter rooms</label>
         <input class='room-filter' id='room-filter' type='search'
                autocomplete='off' placeholder='Filter rooms'/>
@@ -106,6 +120,8 @@
         <ul class='room-list'></ul>
         <p class='room-empty' hidden>No rooms match that filter.</p>
       </div>
+
+      <p class='room-footer'>Type <code>/join name</code> to make a room</p>
     </li>
 
   </ul>
