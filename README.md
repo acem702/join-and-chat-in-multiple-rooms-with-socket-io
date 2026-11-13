@@ -1,7 +1,7 @@
 # join-and-chat
 動態即時多人聊天室（可建立 / 加入房間），基於 node.js + Socket.io + Express。<br>
 
-![version](https://img.shields.io/badge/version-1.6.5-green.svg)
+![version](https://img.shields.io/badge/version-2.0.0-green.svg)
 
 ![join-and-chat](https://cloud.githubusercontent.com/assets/24193072/26714744/837dccfc-47a5-11e7-86e0-953f63dd9c77.png)<br><br>
 
@@ -20,16 +20,18 @@
 <br>
 
 ## Demo
-<a href='https://join-and-chat.herokuapp.com/' target='_blank'>https://join-and-chat.herokuapp.com/<a><br>
+原本的 Heroku 示範站台已停止服務，請依下方說明在本機執行。<br>
 <br>
 
 ## How to use the code
- 必須先安裝 node.js<br>
+ 必須先安裝 node.js（需要 18 以上的版本）<br>
  在命令提示字元進入專案的路徑後輸入：<br><br>
-```npm install --save```<br><br>
+```npm install```<br><br>
 它會為您安裝 package.json 中定義的相依模組，完成後輸入：<br><br>
-```node server/server.js```<br><br>
-這會啟動本地端伺服器，打開瀏覽器在網址輸入 <b>localhost:3232</b> （port 可自行在程式碼中更改) and that's it!<br><br>
+```npm start```<br><br>
+這會啟動本地端伺服器，打開瀏覽器在網址輸入 <b>localhost:3232</b> （port 可透過環境變數 PORT 更改）and that's it!<br><br>
+執行測試：<br><br>
+```npm test```<br><br>
 
 ## License
 MIT license.<br><br>

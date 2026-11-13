@@ -1,9 +1,10 @@
 // Author: GW19 <imgw19@gmail.com>
-// Based on Socket.io
+// Based on Socket.IO
 
 $(function() {
   var FADE_TIME = 150; // ms
   var TYPING_TIMER_LENGTH = 400; // ms
+  var ROOM_LIST_REFRESH = 30000; // ms
   var COLORS = [
     '#e21400', '#91580f', '#f8a700', '#f78b00',
     '#58dc00', '#287b00', '#008dff', '#4ae8c4',
@@ -15,17 +16,23 @@ $(function() {
     '#F3A530', '#56B949', '#844D9E', '#4e1c81'
   ];
 
+  // Validation rules shared with the server (app/chat-rules.js). The server
+  // revalidates everything; these only give the user faster feedback.
+  var rules = window.ChatRules;
+
   // Initialize variables
   var $window = $(window);
   var $usernameInput = $('.usernameInput'); // Input for username
   var $messages = $('.messages'); // Messages area
   var $inputMessage = $('.inputMessage'); // Input message input box
 
+  var $pages = $('.pages'); // Flex row holding both panels
   var $loginPage = $('.login.page'); // login page
   var $chatPage = $('.chat.page'); // Chat room page
   var $roomPage = $('.room.page'); // Room list page
   var $roomList = $('.room-list'); // Room list <ul>
   var $btnTips = $('.btn-tips'); // Tool buttons
+  var $btnCollapse = $('.btn-collapse'); // Room list collapse toggle
 
   // Prompt for setting a username
   var username;
@@ -33,63 +40,69 @@ $(function() {
   var typing = false;
   var lastTypingTime;
   var $currentInput = $usernameInput.focus();
-  var $roomDiv;
-  var roomNameRule = /^(?!\s*$)[a-zA-Z0-9_\u4e00-\u9fa5 \f\n\r\t\v]{1,14}$/;
 
   var socket = io();
 
   function addParticipantsMessage (data) {
-    var message;
-    if (!data.userJoinOrLeftRoom) {
-      if (data.numUsers === 1) {
-        message = '目前只有你一個人在這裡唷！';
-      } else {
-        message = '目前總共有 ' + data.numUsers + ' 位旅客在聊天實驗室。';
-      }
+    // Room joins and leaves carry their own log line; only lab-level events
+    // report the headcount.
+    if (data.userJoinOrLeftRoom) {
+      return;
     }
-    log(message);
+
+    if (data.numUsers === 1) {
+      log('目前只有你一個人在這裡唷！');
+    } else {
+      log('目前總共有 ' + data.numUsers + ' 位旅客在聊天實驗室。');
+    }
   }
 
   // Sets the client's username
   function setUsername () {
-    // If user name is input, get and then emit 'add user' event.
     // trim(): remove the whitespace from the beginning and end of a string.
-    username = cleanInput($usernameInput.val().trim());
+    username = rules.normalizeName($usernameInput.val());
 
-    // If the username is valid
-    if (username) {
-      $loginPage.fadeOut();
-      $chatPage.show();
-      $roomPage.fadeIn();
-      $loginPage.off('click');
-      $currentInput = $inputMessage.focus();
-
-      // Tell the server your username
-      socket.emit('add user', username);
+    if (!rules.isValidUsername(username)) {
+      username = undefined;
+      return;
     }
+
+    $loginPage.fadeOut();
+    $chatPage.show();
+    $roomPage.fadeIn();
+    $loginPage.off('click');
+    $currentInput = $inputMessage.focus();
+
+    // Tell the server your username
+    socket.emit('add user', username);
   }
 
   // Sends a chat message.
   function sendMessage () {
     var message = $inputMessage.val();
-    // Prevent markup from being injected into the message
-    message = cleanInput(message);
-    // if there is a non-empty message and a socket connection
-    if (connected) {
-      $inputMessage.val('');
-      if (message.charAt(0) !== '/') {
-        addChatMessage({
-          username: username,
-          message: message
-        });
-        // tell server to execute 'new message' and send along one parameter
-        socket.emit('new message', message);
 
-        // If input a command with '/'.
-      } else {
-        inputCommand(message);
-      }
+    if (!connected) {
+      return;
     }
+
+    $inputMessage.val('');
+
+    // If input is a command starting with '/'.
+    if (message.charAt(0) === '/') {
+      inputCommand(message);
+      return;
+    }
+
+    if (!rules.isValidMessage(message)) {
+      return;
+    }
+
+    addChatMessage({
+      username: username,
+      message: message
+    });
+    // tell server to execute 'new message' and send along one parameter
+    socket.emit('new message', message);
   }
 
   // Sends a command.
@@ -103,14 +116,14 @@ $(function() {
       // Command /join [room name] = join room.
       case 'join':
         words.shift();
-        var room = words.join(' ');
-        if (roomNameRule.test(room)) {
+        var room = rules.normalizeName(words.join(' '));
+        if (rules.isValidRoomName(room)) {
           socket.emit('join room', room);
           //noinspection JSUnresolvedVariable
           $roomList[0].scrollTop = $roomList[0].scrollHeight;
         } else {
           log('房間名稱長度限制為 1～14 個字元，' +
-              '並只能由中文、英文、數字及底線所組成', {})
+              '並只能由中文、英文、數字及底線所組成');
         }
         break;
 
@@ -120,8 +133,7 @@ $(function() {
         break;
 
       default:
-        message = '您輸入了無效的指令';
-        log(message);
+        log('您輸入了無效的指令');
         break;
     }
   }
@@ -133,19 +145,17 @@ $(function() {
 
     if (typeof options.userConnEvent !== 'undefined') {
       var userName = options.username;
-      var colorOfUserName = getUsernameColor(userName);
       var $usernameDiv = $('<span class="username">')
         .text(userName)
-        .css('color', colorOfUserName);
-      // var $logBodyDiv = $('<span>').text(message);
+        .css('color', getUsernameColor(userName));
       $logDiv = $('<li>')
         .addClass('log')
         .append($usernameDiv, message);
-      addMessageElement($logDiv, options);
     } else {
       $logDiv = $('<li>').addClass('log').text(message);
-      addMessageElement($logDiv, options);
     }
+
+    addMessageElement($logDiv, options);
   }
 
   // Adds the visual chat message to the message list
@@ -158,26 +168,29 @@ $(function() {
       $typingMessages.remove();
     }
 
+    if (data.message === '') {
+      return;
+    }
+
     var userName = data.username;
     var colorOfUserName = getUsernameColor(userName);
     if (data.typing !== true) {
       userName += ': ';
     }
-    if (data.message !== ''){
-      var $usernameDiv = $('<span class="username"/>')
-        .text(userName)
-        .css('color', colorOfUserName);
-      var $messageBodyDiv = $('<span class="messageBody">')
-        .text(data.message);
 
-      var typingClass = data.typing ? 'typing' : '';
-      var $messageDiv = $('<li class="message"/>')
-        .data('username', userName)
-        .addClass(typingClass)
-        .append($usernameDiv, $messageBodyDiv);
+    var $usernameDiv = $('<span class="username"/>')
+      .text(userName)
+      .css('color', colorOfUserName);
+    var $messageBodyDiv = $('<span class="messageBody">')
+      .text(data.message);
 
-      addMessageElement($messageDiv, options);
-    }
+    var typingClass = data.typing ? 'typing' : '';
+    var $messageDiv = $('<li class="message"/>')
+      .data('username', userName)
+      .addClass(typingClass)
+      .append($usernameDiv, $messageBodyDiv);
+
+    addMessageElement($messageDiv, options);
   }
 
   // Adds the visual chat typing message
@@ -227,33 +240,33 @@ $(function() {
     $messages[0].scrollTop = $messages[0].scrollHeight;
   }
 
-  // Prevents input from having injected markup
-  function cleanInput (input) {
-    return $('<div/>').text(input).text();
-  }
-
   // Updates the typing event
   function updateTyping () {
-    if (connected) {
-      if (!typing) {
-        typing = true;
-        socket.emit('typing');
-      }
-      lastTypingTime = (new Date()).getTime();
-
-      setTimeout(function () {
-        var typingTimer = (new Date()).getTime();
-        var timeDiff = typingTimer - lastTypingTime;
-        if (timeDiff >= TYPING_TIMER_LENGTH && typing) {
-          socket.emit('stop typing');
-          typing = false;
-        }
-      }, TYPING_TIMER_LENGTH);
+    if (!connected) {
+      return;
     }
+
+    if (!typing) {
+      typing = true;
+      socket.emit('typing');
+    }
+    lastTypingTime = (new Date()).getTime();
+
+    setTimeout(function () {
+      var typingTimer = (new Date()).getTime();
+      var timeDiff = typingTimer - lastTypingTime;
+      if (timeDiff >= TYPING_TIMER_LENGTH && typing) {
+        socket.emit('stop typing');
+        typing = false;
+      }
+    }, TYPING_TIMER_LENGTH);
   }
 
   // Gets the 'X is typing' messages of a user
   function getTypingMessages (data) {
+    if (!data || typeof data.username === 'undefined') {
+      return $();
+    }
     return $('.typing.message').filter(function () {
       return $(this).data('username') === data.username;
     });
@@ -263,7 +276,7 @@ $(function() {
   function getUsernameColor (username) {
     var eachCharCode = 0;
     var randIndex;
-    for (var ii = 0; ii < username.length; ii++) {
+    for (var ii = 0; ii < (username || '').length; ii++) {
       eachCharCode += username.charCodeAt(ii);
     }
     randIndex = Math.abs(eachCharCode % COLORS.length);
@@ -273,6 +286,11 @@ $(function() {
   // Keyboard events
 
   $window.keydown(function (event) {
+    // Let buttons keep focus so they stay usable from the keyboard.
+    if ($(event.target).is('button')) {
+      return;
+    }
+
     // Auto-focus the current input when a key is typed
     //noinspection JSUnresolvedVariable
     if (!(event.ctrlKey || event.metaKey || event.altKey)) {
@@ -306,14 +324,27 @@ $(function() {
     $inputMessage.focus();
   });
 
+  // Collapse / expand the room list. The chat panel grows into the space.
+  $btnCollapse.on('click', function () {
+    var collapsed = $pages
+      .toggleClass('rooms-collapsed')
+      .hasClass('rooms-collapsed');
+
+    $btnCollapse
+      .attr('aria-expanded', collapsed ? 'false' : 'true')
+      .attr('title', collapsed ? '展開房間列表' : '收合房間列表')
+      .html(collapsed ? '&raquo;' : '&laquo;');
+
+    $inputMessage.focus();
+  });
+
   // Socket events
 
   // Whenever the server emits 'login', log the login message
   socket.on('login', function (data) {
     connected = true;
     // Display the welcome message
-    var message = '● 歡迎來到聊天實驗室 ●';
-    log(message, {
+    log('● 歡迎來到聊天實驗室 ●', {
       prepend: true
     });
     addParticipantsMessage(data);
@@ -331,7 +362,6 @@ $(function() {
       username: data.username
     });
     addParticipantsMessage(data);
-    socket.emit('room list');
   });
 
   // Whenever the server emits 'user left', log it in the chat body
@@ -342,8 +372,6 @@ $(function() {
     });
     addParticipantsMessage(data);
     removeChatTyping(data);
-    // Reload room list.
-    socket.emit('room list');
   });
 
   // Whenever the server emits 'typing', show the typing message
@@ -356,58 +384,70 @@ $(function() {
     removeChatTyping(data);
   });
 
-  socket.on('disconnect', function () {
-    log('您已經中斷連線');
-    // Reload room list.
-    socket.emit('room list');
+  // Server rejected a username, room name or message.
+  socket.on('invalid input', function (data) {
+    log(data && data.message ? data.message : '您輸入了無效的內容');
   });
 
-  socket.on('reconnect', function () {
+  socket.on('disconnect', function () {
+    connected = false;
+    log('您已經中斷連線');
+  });
+
+  // Reconnection lives on the manager in Socket.IO 4, not on the socket.
+  socket.io.on('reconnect', function () {
     log('您已經重新連線');
     if (username) {
       socket.emit('add user', username);
-      // Reload room list.
-      socket.emit('room list');
     }
   });
 
-  socket.on('reconnect_error', function () {
+  socket.io.on('reconnect_error', function () {
     log('重新連線失敗...');
   });
 
   // Show current room list.
   socket.on('show room list', function (room, rooms) {
     $roomList.empty();
-    var roomClassName = room.trim().toLowerCase().replace(/\s/g,'');
 
     $.each(rooms, function (roomName, numUserInRoom) {
-      // Set class name of room's <div> to be clear.
-      var className = roomName.trim().toLowerCase().replace(/\s/g,'');
-      $roomDiv = $('<div class="room"></div>')
-        .html('<b>' + roomName + '</b>'
-          + '<span class="user-number-in-room">'
-          + '(' + numUserInRoom + '人' + ')' + '</span>')
-        .addClass(className)
+      // Built as text nodes, never as an HTML string: room names come from
+      // other users and would otherwise be injected into everyone's page.
+      var $roomName = $('<b/>').text(roomName);
+      var $roomCount = $('<span class="user-number-in-room"/>')
+        .text('(' + numUserInRoom + '人)');
+
+      var $roomDiv = $('<div class="room"/>')
+        .append($roomName, $roomCount)
         .click(function () {
           socket.emit('join room', roomName);
           $inputMessage.focus();
         });
+
+      // Compared against the real room name. This used to go through a
+      // lowercased, whitespace-stripped class name, so "My Room" and
+      // "myroom" collided and highlighted the wrong entry.
+      if (roomName === room) {
+        $roomDiv.addClass('joined-room');
+      }
+
       $roomList.append($roomDiv);
     });
-
-    $('.' + roomClassName).addClass('joined-room');
   });
 
   socket.on('join left result', function (data) {
     // log results.
     log(data.username + data.logAction
-      + data.logLocation + data.roomName, {});
+      + data.logLocation + data.roomName);
   });
 
-  // Every 30 secs. reload current room list.
+  // Periodically reload the current room list as a safety net; the server
+  // also pushes it to everyone whenever it changes.
   setInterval(function () {
-    socket.emit('room list');
-  }, 30000);
+    if (connected) {
+      socket.emit('room list');
+    }
+  }, ROOM_LIST_REFRESH);
 
 
   // jQuery UI Style

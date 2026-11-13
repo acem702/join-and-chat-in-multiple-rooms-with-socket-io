@@ -1,193 +1,289 @@
 // Author: GW19 <imgw19@gmail.com>
-// Based on Socket.io
+// Based on Socket.IO
 
-// Setup basic express server
-var express = require('express');
-var app = express();
-var server = require('http').createServer(app);
-var io = require('socket.io')(server);
-var port = process.env.PORT || 3232;
+'use strict';
 
-server.listen(port, function () {
-  console.log('Server listening at port %d', port);
-});
+const path = require('path');
+const http = require('http');
+const express = require('express');
+const { Server } = require('socket.io');
 
-// Routing
-app.use(express.static(__dirname + '/../app'));
+const rules = require('../app/chat-rules.js');
 
-// Chat room
+const LOBBY = rules.LOBBY;
 
-// Total number of users
-var numUsers = 0;
-// Current room list.
-var curRoomList = {};
+// Action labels used to build the log lines shown in the chat body.
+const logCreate = '已經建立';
+const logJoin = '已經加入';
+const logLeft = '已經離開';
 
-// Action: Create, Join, Left.
-var logCreate = '已經建立';
-var logJoin = '已經加入';
-var logLeft = '已經離開';
+// Location labels: the lab is the site as a whole, a room is inside it.
+const logLab = '聊天實驗室';
+const logRoom = '房間 ';
 
-// Location: Lab (main website, can be joined or left),
-//           Room (can be created, joined, Left)
-var logLab = '聊天實驗室';
-var logRoom = '房間 ';
+function createApp () {
+  const app = express();
+  const server = http.createServer(app);
+  const io = new Server(server);
 
-io.on('connection', function (socket) {
-  var addedUser = false;
-  var curRoomName = '大廳';
+  // Routing
+  app.use(express.static(path.join(__dirname, '..', 'app')));
 
-  // when the client emits 'new message', this listens and executes
-  socket.on('new message', function (data) {
-    // we tell the client to execute 'new message'
-    socket.broadcast.to(curRoomName).emit('new message', {
-      username: socket.username,
-      message: data
-    });
-  });
+  // --- Occupancy -----------------------------------------------------------
+  //
+  // Room membership is read straight from the Socket.IO adapter rather than
+  // kept in counters of our own. Hand-maintained counts drift: a disconnect
+  // that races a room switch, or a reconnect, used to leave rooms stuck in
+  // the list or counts running negative.
 
-  // when the client emits 'add user', this listens and executes
-  socket.on('add user', function (username) {
-    if (addedUser) return;
+  // Sockets that have not sent a valid 'add user' yet are not chat users.
+  function isChatUser (socket) {
+    return Boolean(socket && socket.data && socket.data.username);
+  }
 
-    // we store the username in the socket session for this client
-    socket.username = username;
-    ++numUsers;
-    addedUser = true;
+  function loggedInSockets () {
+    return Array.from(io.sockets.sockets.values()).filter(isChatUser);
+  }
 
-    // Default to join 'Lobby'.
-    socket.join(curRoomName);
+  function userCount () {
+    return loggedInSockets().length;
+  }
 
-    // If there is no the same curRoomName in room list, add it to room list.
-    // And set user number in it = 1, else user number + 1.
-    if (!isRoomExist(curRoomName, curRoomList)) {
-      curRoomList[curRoomName] = 1;
-    } else {
-      ++curRoomList[curRoomName];
+  // { roomName: numberOfUsers }, lobby always present, private per-socket
+  // rooms (Socket.IO puts every socket in a room named after its own id)
+  // excluded.
+  function roomOccupancy () {
+    const adapter = io.sockets.adapter;
+    const occupancy = Object.create(null);
+    occupancy[LOBBY] = 0;
+
+    for (const [roomName, members] of adapter.rooms) {
+      if (adapter.sids.has(roomName)) {
+        continue; // a socket's own private room, not a chat room
+      }
+
+      let count = 0;
+      for (const socketId of members) {
+        if (isChatUser(io.sockets.sockets.get(socketId))) {
+          count += 1;
+        }
+      }
+
+      if (count > 0 || roomName === LOBBY) {
+        occupancy[roomName] = count;
+      }
     }
 
-    // First join chat room, show current room list.
-    socket.emit('show room list', curRoomName, curRoomList);
+    return occupancy;
+  }
 
-    socket.emit('login', {
-      numUsers: numUsers
-    });
+  function roomExists (roomName) {
+    const occupancy = roomOccupancy();
+    return Object.prototype.hasOwnProperty.call(occupancy, roomName) &&
+      occupancy[roomName] > 0;
+  }
 
-    // echo to room (default as 'Lobby') that a person has connected
-    socket.broadcast.emit('user joined', {
-      username: socket.username,
-      numUsers: numUsers,
-      logAction: logJoin,
-      logLocation: logLab,
-      roomName: '',
-      userJoinOrLeftRoom: false
-    });
-  });
+  // Push the room list to every logged-in client. Each client needs its own
+  // current room so it can highlight it, so this is a loop rather than a
+  // single broadcast. Previously only the sockets in the two affected rooms
+  // were refreshed, which left everyone else looking at a stale list.
+  function broadcastRoomList () {
+    const occupancy = roomOccupancy();
+    for (const socket of loggedInSockets()) {
+      socket.emit('show room list', socket.data.currentRoom, occupancy);
+    }
+  }
 
-  // when the client emits 'typing', we broadcast it to others
-  socket.on('typing', function () {
-    socket.broadcast.to(curRoomName).emit('typing', {
-      username: socket.username
-    });
-  });
+  // --- Connection ----------------------------------------------------------
 
-  // when the client emits 'stop typing', we broadcast it to others
-  socket.on('stop typing', function () {
-    socket.broadcast.emit('stop typing', {
-      username: socket.username
-    });
-  });
+  io.on('connection', function (socket) {
+    socket.data.username = null;
+    socket.data.currentRoom = LOBBY;
 
-  // when the user disconnects, perform this
-  socket.on('disconnect', function () {
-    if (addedUser) {
-      --numUsers;
-      --curRoomList[curRoomName];
-
-      // If there is no user in room, delete this room,
-      // Except this room is 'Lobby'.
-      if (curRoomList[curRoomName] === 0 && curRoomName !== '大廳') {
-        delete curRoomList[curRoomName];
+    // when the client emits 'new message', this listens and executes
+    socket.on('new message', function (data) {
+      if (!isChatUser(socket) || !rules.isValidMessage(data)) {
+        return;
       }
 
-      if (numUsers === 0) {
-        curRoomList = {};
+      // we tell the client to execute 'new message'
+      socket.broadcast.to(socket.data.currentRoom).emit('new message', {
+        username: socket.data.username,
+        message: data
+      });
+    });
+
+    // when the client emits 'add user', this listens and executes
+    socket.on('add user', function (username) {
+      if (isChatUser(socket)) {
+        return;
       }
+
+      // The browser limits this too, but a crafted client can send anything,
+      // so the server decides.
+      const name = rules.normalizeName(username);
+      if (!rules.isValidUsername(name)) {
+        socket.emit('invalid input', {
+          field: 'username',
+          message: '暱稱需為 1～14 個字元，且不可為空白'
+        });
+        return;
+      }
+
+      // we store the username in the socket session for this client
+      socket.data.username = name;
+      socket.data.currentRoom = LOBBY;
+
+      // Default to join the lobby.
+      socket.join(LOBBY);
+
+      socket.emit('login', {
+        numUsers: userCount()
+      });
+
+      // echo to everyone that a person has connected
+      socket.broadcast.emit('user joined', {
+        username: name,
+        numUsers: userCount(),
+        logAction: logJoin,
+        logLocation: logLab,
+        roomName: '',
+        userJoinOrLeftRoom: false
+      });
+
+      // First join: show the room list to everyone, including this client.
+      broadcastRoomList();
+    });
+
+    // when the client emits 'typing', we broadcast it to others
+    socket.on('typing', function () {
+      if (!isChatUser(socket)) {
+        return;
+      }
+      socket.broadcast.to(socket.data.currentRoom).emit('typing', {
+        username: socket.data.username
+      });
+    });
+
+    // when the client emits 'stop typing', we broadcast it to others.
+    // Scoped to the current room: this used to broadcast globally, so a user
+    // in one room could clear another user's typing indicator in a different
+    // room.
+    socket.on('stop typing', function () {
+      if (!isChatUser(socket)) {
+        return;
+      }
+      socket.broadcast.to(socket.data.currentRoom).emit('stop typing', {
+        username: socket.data.username
+      });
+    });
+
+    // when the user disconnects, perform this
+    socket.on('disconnect', function () {
+      if (!isChatUser(socket)) {
+        return;
+      }
+
+      const name = socket.data.username;
+      socket.data.username = null;
+
       // echo globally that this client has left
       socket.broadcast.emit('user left', {
-        username: socket.username,
-        numUsers: numUsers,
+        username: name,
+        numUsers: userCount(),
         logAction: logLeft,
         logLocation: logLab,
-        roomName: ''
+        roomName: '',
+        userJoinOrLeftRoom: false
       });
-    }
-  });
 
-  // Show room list to user.
-  socket.on('room list', function () {
-    socket.emit('show room list', curRoomName, curRoomList);
-  });
+      // The adapter has already dropped this socket, so the refreshed list
+      // reflects the departure.
+      broadcastRoomList();
+    });
 
-  socket.on('join room', function (room) {
-    socket.emit('stop typing');
+    // Show the room list to this user.
+    socket.on('room list', function () {
+      if (!isChatUser(socket)) {
+        return;
+      }
+      socket.emit('show room list', socket.data.currentRoom, roomOccupancy());
+    });
 
-    if (room !== curRoomName) {
-      // Before join room, first need to leave current room. -------------------
-      socket.leave(curRoomName);
-      socket.broadcast.to(curRoomName).emit('user left', {
-        username: socket.username,
-        numUsers: numUsers,
+    socket.on('join room', function (room) {
+      if (!isChatUser(socket)) {
+        return;
+      }
+
+      const target = rules.normalizeName(room);
+      if (!rules.isValidRoomName(target)) {
+        socket.emit('invalid input', {
+          field: 'room',
+          message: '房間名稱長度限制為 1～14 個字元，' +
+            '並只能由中文、英文、數字及底線所組成'
+        });
+        return;
+      }
+
+      const previous = socket.data.currentRoom;
+      if (target === previous) {
+        return;
+      }
+
+      // Clear any typing indicator this user left behind in the old room.
+      socket.broadcast.to(previous).emit('stop typing', {
+        username: socket.data.username
+      });
+
+      // Before joining a room, leave the current one. ------------------------
+      socket.leave(previous);
+      socket.broadcast.to(previous).emit('user left', {
+        username: socket.data.username,
+        numUsers: userCount(),
         logAction: logLeft,
         logLocation: logRoom,
-        roomName: '「' + curRoomName + '」',
+        roomName: '「' + previous + '」',
         userJoinOrLeftRoom: true
       });
-      --curRoomList[curRoomName];
 
-      // If there is no user in room, delete this room,
-      // Except this room is 'Lobby'.
-      if (curRoomList[curRoomName] === 0 && curRoomName !== '大廳') {
-        delete curRoomList[curRoomName];
-      }
+      // Then join the new room. ---------------------------------------------
+      // Checked before joining, so an empty room counts as a creation.
+      const isNewRoom = !roomExists(target);
+      socket.join(target);
+      socket.data.currentRoom = target;
 
-      // Then join a new room. -------------------------------------------------
-      socket.join(room);
+      socket.emit('join left result', {
+        username: '您',
+        logAction: isNewRoom ? logCreate : logJoin,
+        logLocation: logRoom,
+        roomName: '「' + target + '」'
+      });
 
-      // If there is no the same room in room list, add it to room list.
-      if (!isRoomExist(room, curRoomList)) {
-        curRoomList[room] = 1;
-        socket.emit('join left result', {
-          username: '您',
-          logAction: logCreate,
-          logLocation: logRoom,
-          roomName: '「' + room + '」'
-        });
-      } else {
-        ++curRoomList[room];
-        socket.emit('join left result', {
-          username: '您',
-          logAction: logJoin,
-          logLocation: logRoom,
-          roomName: '「' + room + '」'
-        });
-      }
-
-      // Every time someone join a room, reload current room list.
-      socket.emit('show room list', room, curRoomList);
-      curRoomName = room;
-      socket.broadcast.to(room).emit('user joined', {
-        username: socket.username,
-        numUsers: numUsers,
+      socket.broadcast.to(target).emit('user joined', {
+        username: socket.data.username,
+        numUsers: userCount(),
         logAction: logJoin,
         logLocation: logRoom,
-        roomName: '「' + room + '」',
+        roomName: '「' + target + '」',
         userJoinOrLeftRoom: true
-      })
-    }
-  });
-});
+      });
 
-// Check if roomName is in roomList Object.
-function isRoomExist (roomName, roomList) {
-  return roomList[roomName] >= 0;
+      // Every time someone joins a room, refresh the list for everyone.
+      broadcastRoomList();
+    });
+  });
+
+  return { app, server, io };
 }
+
+// Only listen when run directly, so tests can start their own instance on an
+// ephemeral port.
+if (require.main === module) {
+  const port = process.env.PORT || 3232;
+  const { server } = createApp();
+  server.listen(port, function () {
+    console.log('Server listening at port %d', port);
+  });
+}
+
+module.exports = { createApp, LOBBY };

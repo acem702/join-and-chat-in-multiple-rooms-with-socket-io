@@ -5,6 +5,7 @@
 
 <head>
   <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
   <title>Join and Chat</title>
   <link href='style.css' rel='stylesheet' >
 
@@ -16,11 +17,8 @@
         href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/base/jquery-ui.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
 
-  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"
-          integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="
-          crossorigin="anonymous"></script>
-
   <script src='/socket.io/socket.io.js'></script>
+  <script src='/chat-rules.js'></script>
   <script src='/main.js'></script>
 </head>
 
@@ -32,7 +30,7 @@
         <ul class='messages'></ul>
       </div>
 
-      <button class='btn btn-tips' title='小提示'>?</button>
+      <button class='btn btn-tips' type='button' title='小提示'>?</button>
 
       <div id='effect-tips' class='ui-tips'>
         <h3 class='tips-title'>小提示</h3>
@@ -42,12 +40,14 @@
           （房間名稱長度限制為 1～14 個字元，
           並只能由中文、英文、數字及底線所組成）<br><br>
           <h4>/ls：刷新房間列表</h4>
-          （系統每30秒會自動刷新，另外有人加入或離開房間也會立即刷新）<br>
+          （系統每30秒會自動刷新，另外有人加入或離開房間也會立即刷新）<br><br>
+          <h4>收合房間列表</h4>
+          （點選房間列表左上角的 « 按鈕可收合∕展開右側面板）<br>
           <br>
           作者：GW19 &nbsp;
           &lt; <a href='mailto:imgw19@gmail.com'>imgw19@gmail.com</a> &gt;<br>
           Github：<a href='https://github.com/gw19/join-and-chat'
-                    target='_blank'>join-and-chat</a>
+                    target='_blank' rel='noopener'>join-and-chat</a>
         </div>
       </div>
 
@@ -66,6 +66,10 @@
     </li>
 
     <li class='room page' id='room-page'>
+      <button class='btn btn-collapse' type='button'
+              title='收合房間列表' aria-expanded='true'
+              aria-controls='room-page'>&laquo;</button>
+      <span class='room-rail-label' aria-hidden='true'>房間列表</span>
       <h1 class='room-title'>房間列表</h1>
       <p class='room-hint'>點選房間區塊可直接加入該房間</p>
       <ul class='room-list'></ul>
